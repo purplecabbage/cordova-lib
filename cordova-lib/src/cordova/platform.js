@@ -113,6 +113,14 @@ function update(hooks, projectRoot, targets, opts) {
             return Q.reject(new CordovaError('Platform "' + plat + '" is not installed. See "platform list".'));
         }
 
+        // Windows8.1: special case to upgrade from windows8 to windows platform 
+        if (plat == 'windows8' && !fs.existsSync(path.join(projectRoot, 'platforms', 'windows'))) {
+            var platformPathWindows = path.join(projectRoot, 'platforms', 'windows');
+            fs.renameSync(platformPath, platformPathWindows)
+            plat = 'windows';
+            platformPath = platformPathWindows;
+        }
+
         function copyCordovaJs() {
             var parser = new platforms[plat].parser(platformPath);
             var platform_www = path.join(platformPath, 'platform_www');
@@ -279,6 +287,11 @@ module.exports = function platform(command, targets) {
     };
     switch(command) {
         case 'add':
+            // Windows8.1: windows8 is now alias for windows
+            var idxWindows8 = targets.indexOf('windows8');
+            if (idxWindows8 >=0) {
+                targets[idxWindows8] = 'windows';
+            }
             return add(hooks, projectRoot, targets, opts);
         case 'rm':
         case 'remove':

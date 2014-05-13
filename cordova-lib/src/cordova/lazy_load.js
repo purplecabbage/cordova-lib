@@ -38,7 +38,7 @@ module.exports = {
             return Q.reject(new Error('Cordova library "' + platform + '" not recognized.'));
         }
 
-        var url = platforms[platform].url + ';a=snapshot;h=' + platforms[platform].version + ';sf=tgz';
+        var url = platforms[platform].url;// TODO tmp hack for win81  + ';a=snapshot;h=' + platforms[platform].version + ';sf=tgz';
         return module.exports.custom(url, 'cordova', platform, platforms[platform].version);
     },
     // Returns a promise for the path to the lazy-loaded directory.
@@ -51,8 +51,8 @@ module.exports = {
         var uri = URL.parse(url);
         var isUri = uri.protocol && uri.protocol[1] != ':'; // second part of conditional is for awesome windows support. fuuu windows
         if (isUri) {
-            download_dir = (platform == 'wp7' || platform == 'wp8' ? path.join(util.libDirectory, 'wp', id, version) :
-                                                                     path.join(util.libDirectory, platform, id, version));
+            download_dir = (platform == 'wp8') ? path.join(util.libDirectory, 'wp', id, version) :
+                path.join(util.libDirectory, platform, id, version);
             lib_dir = platforms[platform] && platforms[platform].subdirectory && platform !== "blackberry10" ? path.join(download_dir, platforms[platform].subdirectory) : download_dir;
             if (fs.existsSync(download_dir)) {
                 events.emit('verbose', id + ' library for "' + platform + '" already exists. No need to download. Continuing.');
