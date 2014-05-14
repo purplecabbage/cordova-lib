@@ -194,8 +194,8 @@ function remove_plugin_changes(plugin_name, plugin_id, is_top_level) {
         if (file == 'package.appxmanifest' &&
             // Check if package.appxmanifest exists in platform dir
             !fs.existsSync(path.join(self.project_dir, 'package.appxmanifest')) &&
-            self.platform == 'windows8') {
-            events.emit('warn', 'package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
+            self.platform == 'windows') {
+            events.emit('warn', 'WARNING: Package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
             var substs = ["package.phone.appxmanifest", "package.store.appxmanifest", "package.store80.appxmanifest"];
             for (var subst in substs) {
                 events.emit('verbose', 'Applying munge to ' + substs[subst]);
@@ -256,8 +256,8 @@ function add_plugin_changes(plugin_id, plugin_vars, is_top_level, should_increme
         if (file == 'package.appxmanifest' &&
             // Check if package.appxmanifest exists in platform dir
             !fs.existsSync(path.join(self.project_dir, 'package.appxmanifest')) &&
-            self.platform == 'windows8') {
-            events.emit('warn', 'package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
+            self.platform == 'windows') {
+            events.emit('warn', 'WARNING: Package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
             var substs = ["package.phone.appxmanifest", "package.store.appxmanifest", "package.store80.appxmanifest"];
             for (var subst in substs) {
                 events.emit('verbose', 'Applying munge to ' + substs[subst]);
