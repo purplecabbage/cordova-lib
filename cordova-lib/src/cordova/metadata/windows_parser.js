@@ -50,6 +50,7 @@ module.exports = function windows_parser(project) {
             this.oldProjectTemplate ? '.jsproj' : '.projitems'));
 
         if (this.oldProjectTemplate) {
+            this.windows8_proj_dir = project;
             this.manifest_path = path.join(this.windows_proj_dir, 'package.appxmanifest');
         }
 

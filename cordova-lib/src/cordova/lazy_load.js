@@ -38,7 +38,10 @@ module.exports = {
             return Q.reject(new Error('Cordova library "' + platform + '" not recognized.'));
         }
 
-        var url = platforms[platform].url;// TODO tmp hack for win81  + ';a=snapshot;h=' + platforms[platform].version + ';sf=tgz';
+        var url = platforms[platform].url + ';a=snapshot;h=' + platforms[platform].version + ';sf=tgz';
+        if (platform == 'windows' || platform == 'windows8') {
+            url = platforms[platform].url; // TODO tmp hack for win81
+        }
         return module.exports.custom(url, 'cordova', platform, platforms[platform].version);
     },
     // Returns a promise for the path to the lazy-loaded directory.
