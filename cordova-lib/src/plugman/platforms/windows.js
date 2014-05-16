@@ -22,7 +22,7 @@ var common = require('./common'),
     glob = require('glob'),
     shell = require('shelljs'),
     fs = require('fs'),
-    w8jsproj = require('../util/w8jsproj'),
+    w8jsproj = require('../util/proj'),
     xml_helpers = require('../../util/xml-helpers');
 
 
