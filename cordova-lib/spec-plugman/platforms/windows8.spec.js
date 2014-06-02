@@ -1,4 +1,4 @@
-var windows8 = require('../../src/plugman/platforms/windows8'),
+var windows8 = require('../../src/plugman/platforms/windows'),
     common  = require('../../src/plugman/platforms/common'),
     install = require('../../src/plugman/install'),
     path    = require('path'),

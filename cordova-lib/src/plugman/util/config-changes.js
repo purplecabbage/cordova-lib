@@ -189,6 +189,18 @@ function remove_plugin_changes(plugin_name, plugin_id, is_top_level) {
             );
             continue;
         }
+        // This is for compatibility of old plugins with new unified windows platform
+        if (file == 'package.appxmanifest' &&
+            // Check if package.appxmanifest exists in platform dir
+            !fs.existsSync(path.join(self.project_dir, 'package.appxmanifest')) &&
+            self.platform == 'windows') {
+            events.emit('warn', 'WARNING: Package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
+            var substs = ["package.phone.appxmanifest", "package.store.appxmanifest", "package.store80.appxmanifest"];
+            for (var subst in substs) {
+                events.emit('verbose', 'Applying munge to ' + substs[subst]);
+                self.apply_file_munge(substs[subst], munge.files[file], true);
+            }
+        }
         self.apply_file_munge(file, munge.files[file], /* remove = */ true);
     }
 
@@ -238,6 +250,18 @@ function add_plugin_changes(plugin_id, plugin_vars, is_top_level, should_increme
                 'which are no longer supported. Support has been removed as of Cordova 3.4.'
             );
             continue;
+        }
+        // This is for compatibility of old plugins with new unified windows platform
+        if (file == 'package.appxmanifest' &&
+            // Check if package.appxmanifest exists in platform dir
+            !fs.existsSync(path.join(self.project_dir, 'package.appxmanifest')) &&
+            self.platform == 'windows') {
+            events.emit('warn', 'WARNING: Package.appxmanifest doesn\'t exists. Assume that this is a unified windows project.');
+            var substs = ["package.phone.appxmanifest", "package.store.appxmanifest", "package.store80.appxmanifest"];
+            for (var subst in substs) {
+                events.emit('verbose', 'Applying munge to ' + substs[subst]);
+                self.apply_file_munge(substs[subst], munge.files[file]);
+            }
         }
         self.apply_file_munge(file, munge.files[file]);
     }
@@ -296,6 +320,12 @@ function generate_plugin_config_munge(plugin_dir, vars) {
     var plugin_xml = plugin_config.data;
 
     var platformTag = plugin_xml.find('platform[@name="' + self.platform + '"]');
+    // Windows8.1: for smooth transition and to prevent mass api failures
+    // we allow using windows8 tag for new windows platform
+    if (self.platform == 'windows' && !platformTag) {
+         platformTag = plugin_xml.find('platform[@name="' + 'windows8' + '"]');
+     }
+
     var changes = [];
     // add platform-agnostic config changes
     changes = changes.concat(plugin_xml.findall('config-file'));

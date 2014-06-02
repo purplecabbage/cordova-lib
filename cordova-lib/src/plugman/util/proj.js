@@ -1,57 +1,25 @@
-/*
-  Helper for dealing with Windows Store JS app .jsproj files
-*/
-
-
 var xml_helpers = require('../../util/xml-helpers'),
     et = require('elementtree'),
     fs = require('fs'),
     shell = require('shelljs'),
-    events = require('../events'),
     path = require('path');
 
-var WindowsStoreProjectTypeGUID = "{BC8A1FFA-BEE3-4634-8014-F334798102B3}";  // any of the below, subtype
-var WinCSharpProjectTypeGUID = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";    // .csproj
-var WinVBnetProjectTypeGUID = "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}";     // who the ef cares?
-var WinCplusplusProjectTypeGUID = "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}"; // .vcxproj
-
-
-function jsproj(location) {
-    events.emit('verbose','creating jsproj from project at : ' + location);
+function proj(location) {
     this.location = location;
     this.xml = xml_helpers.parseElementtreeSync(location);
+    this.ext = path.extname(location).toLowerCase();
     return this;
 }
 
-jsproj.prototype = {
-    location:null,
-    xml:null,
-    plugins_dir:"Plugins",
+proj.prototype = {
+    location: null,
+    xml: null,
+    ext: null,
     write:function() {
         fs.writeFileSync(this.location, this.xml.write({indent:4}), 'utf-8');
     },
-    // add/remove the item group for SDKReference
-    // example :
-    // <ItemGroup><SDKReference Include="Microsoft.VCLibs, version=12.0" /></ItemGroup>
-    addSDKRef:function(incText) {
-        var item_group = new et.Element('ItemGroup');
-        var elem = new et.Element('SDKReference');
-        elem.attrib.Include = incText;
-
-        item_group.append(elem);
-        this.xml.getroot().append(item_group);
-    },
-
-    removeSDKRef:function(incText) {
-        var item_group = this.xml.find('ItemGroup/SDKReference[@Include="' + incText + '"]/..');
-        if(item_group) { // TODO: error handling
-            this.xml.getroot().remove(0, item_group);
-        }
-    },
 
     addReference:function(relPath,src) {
-
-        events.emit('verbose','addReference::' + relPath);
 
         var item = new et.Element('ItemGroup');
         var extName = path.extname(relPath);
@@ -77,7 +45,6 @@ jsproj.prototype = {
     },
 
     removeReference:function(relPath) {
-        events.emit('verbose','removeReference::' + relPath);
 
         var extName = path.extname(relPath);
         var includeText = path.basename(relPath,extName);
@@ -96,9 +63,43 @@ jsproj.prototype = {
         // make ItemGroup to hold file.
         var item = new et.Element('ItemGroup');
 
-        var content = new et.Element('Content');
+        var extName = path.extname(relative_path);
+        
+        if (extName == ".xaml" && this.ext == '.csproj') { // check if it's a .xaml page
+            var page = new et.Element('Page');
+            var sub_type = new et.Element('SubType');
+
+            sub_type.text = "Designer";
+            page.append(sub_type);
+            page.attrib.Include = relative_path;
+
+            var gen = new et.Element('Generator');
+            gen.text = "MSBuild:Compile";
+            page.append(gen);
+
+            var item_groups = this.xml.findall('ItemGroup');
+            if(item_groups.length === 0) {
+                item.append(page);
+            } else {
+                item_groups[0].append(page);
+            }
+        } else if (extName == ".cs" && this.ext == '.csproj') { // check if it's a .cs file
+            var compile = new et.Element('Compile');
+            compile.attrib.Include = relative_path;
+            // check if it's a .xaml.cs page that would depend on a .xaml of the same name
+            if (relative_path.indexOf('.xaml.cs', relative_path.length - 8) > -1) {
+                var dep = new et.Element('DependentUpon');
+                var parts = relative_path.split('\\');
+                var xaml_file = parts[parts.length - 1].substr(0, parts[parts.length - 1].length - 3); // Benn, really !?
+                dep.text = xaml_file;
+                compile.append(dep);
+            }
+            item.append(compile);
+        } else { // otherwise add it normally
+            var content = new et.Element('Content');
             content.attrib.Include = relative_path;
-        item.append(content);
+            item.append(content);
+        }
 
         this.xml.getroot().append(item);
     },
@@ -112,14 +113,18 @@ jsproj.prototype = {
         var item_groups = this.xml.findall('ItemGroup');
         for (var i = 0, l = item_groups.length; i < l; i++) {
             var group = item_groups[i];
-            var files = group.findall('Content');
+            var files = this.ext == '.csproj' ?
+                group.findall('Compile').concat(group.findall('Page')).concat(group.findall('Content')) :
+                group.findall('Content');
             for (var j = 0, k = files.length; j < k; j++) {
                 var file = files[j];
                 if (file.attrib.Include == relative_path) {
                     // remove file reference
                     group.remove(0, file);
                     // remove ItemGroup if empty
-                    var new_group = group.findall('Content');
+                    var new_group = this.ext == '.csproj' ?
+                        group.findall('Compile').concat(group.findall('Page')).concat(group.findall('Content')) :
+                        group.findall('Content');
                     if(new_group.length < 1) {
                         this.xml.getroot().remove(0, group);
                     }
@@ -131,7 +136,13 @@ jsproj.prototype = {
     },
     // relative path must include the project file, so we can determine .csproj, .jsproj, .vcxproj...
     addProjectReference:function(relative_path) {
-        events.emit('verbose','adding project reference to ' + relative_path);
+
+        if (this.ext == '.csproj') return;
+
+        var WindowsStoreProjectTypeGUID = "{BC8A1FFA-BEE3-4634-8014-F334798102B3}";  // any of the below, subtype
+        var WinCSharpProjectTypeGUID = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";    // .csproj
+        var WinVBnetProjectTypeGUID = "{F184B08F-C81C-45F6-A57F-5ABD9991F28F}";     // who the ef cares?
+        var WinCplusplusProjectTypeGUID = "{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}"; // .vcxproj
 
         relative_path = relative_path.split('/').join('\\');
         // read the solution path from the base directory
@@ -184,10 +195,11 @@ jsproj.prototype = {
             projRef.attrib.Include = relative_path;
             item.append(projRef);
         this.xml.getroot().append(item);
-
     },
+
     removeProjectReference:function(relative_path) {
-        events.emit('verbose','removing project reference to ' + relative_path);
+
+        if (this.ext == '.csproj') return;
 
         // find the guid + name of the referenced project
         var pluginProjectXML = xml_helpers.parseElementtreeSync(relative_path);
@@ -233,7 +245,32 @@ jsproj.prototype = {
         if(projectRefNodesPar) {
             this.xml.getroot().remove(0, projectRefNodesPar);
         }
+    },
+
+    // add/remove the item group for SDKReference
+    // example :
+    // <ItemGroup><SDKReference Include="Microsoft.VCLibs, version=12.0" /></ItemGroup>
+    addSDKRef:function(incText) {
+
+        if (this.ext == '.csproj') return;
+
+        var item_group = new et.Element('ItemGroup');
+        var elem = new et.Element('SDKReference');
+        elem.attrib.Include = incText;
+
+        item_group.append(elem);
+        this.xml.getroot().append(item_group);
+    },
+
+    removeSDKRef:function(incText) {
+
+        if (this.ext == '.csproj') return;
+
+        var item_group = this.xml.find('ItemGroup/SDKReference[@Include="' + incText + '"]/..');
+        if(item_group) { // TODO: error handling
+            this.xml.getroot().remove(0, item_group);
+        }
     }
 };
 
-module.exports = jsproj;
+module.exports = proj;

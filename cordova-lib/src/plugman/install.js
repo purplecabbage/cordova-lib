@@ -507,6 +507,11 @@ function handleInstall(actions, plugin_id, plugin_et, platform, project_dir, plu
     www_dir = www_dir || handler.www_dir(project_dir);
 
     var platformTag = plugin_et.find('./platform[@name="'+platform+'"]');
+    // Windows8.1: for smooth transition and to prevent mass api failures
+    // we allow using windows8 tag for new windows platform
+    if (platform == 'windows' && !platformTag) {
+         platformTag = plugin_et.find('platform[@name="' + 'windows8' + '"]');
+     }
     var assets = plugin_et.findall('asset');
     if (platformTag) {
 

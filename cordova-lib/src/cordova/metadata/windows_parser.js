@@ -31,29 +31,44 @@ var fs            = require('fs'),
     config        = require('../config'),
     hooker        = require('../hooker');
 
-module.exports = function windows8_parser(project) {
+module.exports = function windows_parser(project) {
     try {
-        // TODO : Check that it's not a windows8 project?
-        var jsproj_file   = fs.readdirSync(project).filter(function(e) { return e.match(/\.jsproj$/i); })[0];
-        if (!jsproj_file) throw new CordovaError('No .jsproj file in "'+project+'"');
-        this.windows8_proj_dir = project;
-        this.jsproj_path  = path.join(this.windows8_proj_dir, jsproj_file);
-        this.sln_path     = path.join(this.windows8_proj_dir, jsproj_file.replace(/\.jsproj/, '.sln'));
+        this.oldProjectTemplate = false;
+        // Check that it's a universal windows store project
+        var proj_file = fs.readdirSync(project).filter(function(e) { return e.match(/\.shproj$/i); })[0];
+        if (!proj_file) {
+            this.oldProjectTemplate = true;
+            proj_file = fs.readdirSync(project).filter(function(e) { return e.match(/\.jsproj$/i); })[0];
+        }
+        if (!proj_file) {
+            throw new CordovaError('No project file in "'+project+'"');
+        }
+        this.windows_proj_dir = project;
+        this.proj_path = path.join(this.windows_proj_dir, proj_file);
+        this.sln_path = path.join(this.windows_proj_dir, proj_file.replace(/\.(shproj|jsproj)/, '.sln'));
+        this.projitems_path = path.join(this.windows_proj_dir, proj_file.replace(/\.(shproj|jsproj)/,
+            this.oldProjectTemplate ? '.jsproj' : '.projitems'));
+
+        if (this.oldProjectTemplate) {
+            this.windows8_proj_dir = project;
+            this.manifest_path = path.join(this.windows_proj_dir, 'package.appxmanifest');
+        }
+
     } catch(e) {
-        throw new CordovaError('The provided path "' + project + '" is not a Windows 8 project. ' + e);
+        throw new CordovaError('The provided path "' + project + '" is not a Windows project. ' + e);
     }
-    this.manifest_path  = path.join(this.windows8_proj_dir, 'package.appxmanifest');
 };
 
 // Returns a promise
 module.exports.check_requirements = function(project_root) {
-    events.emit('log', 'Checking windows8 requirements...');
-    var lib_path = path.join(util.libDirectory, 'windows8', 'cordova',
-                    require('../platforms').windows8.version, 'windows8');
+    events.emit('log', 'Checking windows requirements...');
+    var lib_path = path.join(util.libDirectory, 'windows', 'cordova',
+                    require('../platforms').windows8.version, 'windows');
 
-    var custom_path = config.has_custom_path(project_root, 'windows8');
+    var custom_path = config.has_custom_path(project_root, 'windows8') ||
+        config.has_custom_path(project_root, 'windows');
     if (custom_path) {
-        lib_path = path.join(custom_path, "windows8");
+        lib_path = path.join(custom_path, "windows");
     }
     var command = '"' + path.join(lib_path, 'bin', 'check_reqs') + '"';
     events.emit('verbose', 'Running "' + command + '" (output to follow)');
@@ -77,6 +92,12 @@ module.exports.prototype = {
         //check config parser
         if (config instanceof ConfigParser) {
         } else throw new Error('update_from_config requires a ConfigParser object');
+
+        if (!this.oldProjectTemplate) {
+            return;
+        }
+
+        // code below is required for compatibility reason. New template version is not required this anymore.
 
         //Get manifest file
         var manifest = xml.parseElementtreeSync(this.manifest_path);
@@ -182,18 +203,18 @@ module.exports.prototype = {
                 shell.cp('-f', src, dest);
             }
         });
-
     },
+
     // Returns the platform-specific www directory.
     www_dir:function() {
-        return path.join(this.windows8_proj_dir, 'www');
+        return path.join(this.windows_proj_dir, 'www');
     },
     config_xml:function() {
-        return path.join(this.windows8_proj_dir,"config.xml");
+        return path.join(this.windows_proj_dir,"config.xml");
     },
     // copy files from merges directory to actual www dir
     copy_merges:function(merges_sub_path) {
-        var merges_path = path.join(util.appDir(util.isCordova(this.windows8_proj_dir)), 'merges', merges_sub_path);
+        var merges_path = path.join(util.appDir(util.isCordova(this.windows_proj_dir)), 'merges', merges_sub_path);
         if (fs.existsSync(merges_path)) {
             var overrides = path.join(merges_path, '*');
             shell.cp('-rf', overrides, this.www_dir());
@@ -208,9 +229,9 @@ module.exports.prototype = {
 
     // Replace the www dir with contents of platform_www and app www and updates the csproj file.
     update_www:function() {
-        var projectRoot = util.isCordova(this.windows8_proj_dir);
+        var projectRoot = util.isCordova(this.windows_proj_dir);
         var app_www = util.projectWww(projectRoot);
-        var platform_www = path.join(this.windows8_proj_dir, 'platform_www');
+        var platform_www = path.join(this.windows_proj_dir, 'platform_www');
 
         // Clear the www dir
         shell.rm('-rf', this.www_dir());
@@ -225,41 +246,6 @@ module.exports.prototype = {
         shell.cp('-rf', path.join(platform_www, '*'), this.www_dir());
     },
 
-    // updates the jsproj file to explicitly list all www content.
-    update_jsproj:function() {
-        var jsproj_xml = xml.parseElementtreeSync(this.jsproj_path);
-        // remove any previous references to the www files
-        var item_groups = jsproj_xml.findall('ItemGroup');
-        for (var i = 0, l = item_groups.length; i < l; i++) {
-            var group = item_groups[i];
-            var files = group.findall('Content');
-            for (var j = 0, k = files.length; j < k; j++) {
-                var file = files[j];
-                if (file.attrib.Include.substr(0, 3) == 'www') {
-                    // remove file reference
-                    group.remove(0, file);
-                    // remove ItemGroup if empty
-                    var new_group = group.findall('Content');
-                    if(new_group.length < 1) {
-                        jsproj_xml.getroot().remove(0, group);
-                    }
-                }
-            }
-        }
-
-        // now add all www references back in from the root www folder
-        var project_root = util.isCordova(this.windows8_proj_dir);
-        var www_files = this.folder_contents('www', this.www_dir());
-        for(file in www_files) {
-            var item = new et.Element('ItemGroup');
-            var content = new et.Element('Content');
-            content.attrib.Include = www_files[file];
-            item.append(content);
-            jsproj_xml.getroot().append(item);
-        }
-        // save file
-        fs.writeFileSync(this.jsproj_path, jsproj_xml.write({indent:4}), 'utf-8');
-    },
     // Returns an array of all the files in the given directory with relative paths
     // - name     : the name of the top level directory (i.e all files will start with this in their path)
     // - dir     : the directory whos contents will be listed under 'name' directory
@@ -284,9 +270,54 @@ module.exports.prototype = {
         return results;
     },
 
+    // updates the jsproj file to explicitly list all www content.
+    update_jsproj:function() {
+        if (!this.oldProjectTemplate) {
+            // requires for old Windows8 proj template only 
+            return;
+        }
+        // remove all unnecessary references
+        var jsproj_xml = xml.parseElementtreeSync(this.proj_path);
+        // remove any previous references to the www files
+        var item_groups = jsproj_xml.findall('ItemGroup');
+        for (var i = 0, l = item_groups.length; i < l; i++) {
+            var group = item_groups[i];
+            var files = group.findall('Content');
+            for (var j = 0, k = files.length; j < k; j++) {
+                var file = files[j];
+                if (file.attrib.Include.substr(0, 3) == 'www' || file.attrib.Include == 'config.xml') {
+                    // remove file reference
+                    group.remove(0, file);
+                    // remove ItemGroup if empty
+                    var new_group = group.findall('Content');
+                    if(new_group.length < 1) {
+                        jsproj_xml.getroot().remove(0, group);
+                    }
+                }
+            }
+        }
+
+        // now add single reference to www folder content and config.xml
+        var item = new et.Element('ItemGroup');
+        var content = new et.Element('Content');
+        content.attrib.Include = 'www\\**';
+        item.append(content);
+        jsproj_xml.getroot().append(item);
+
+        var item2 = new et.Element('ItemGroup');
+        var content2 = new et.Element('Content');
+        content2.attrib.Include = 'config.xml';
+        item2.append(content2);
+        jsproj_xml.getroot().append(item2);
+
+        // save file
+        fs.writeFileSync(this.proj_path, jsproj_xml.write({indent:4}), 'utf-8');
+    },
+
+
     // calls the nessesary functions to update the windows8 project
     update_project:function(cfg) {
-        //console.log("Updating windows8 project...");
+        // console.log("Updating windows8 project...");
 
         try {
             this.update_from_config(cfg);
@@ -303,6 +334,7 @@ module.exports.prototype = {
             // overrides (merges) are handled in update_www()
             that.update_jsproj();
             that.add_bom();
+
             util.deleteSvnFolders(that.www_dir());
         });
     },

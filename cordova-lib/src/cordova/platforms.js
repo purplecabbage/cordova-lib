@@ -40,13 +40,6 @@ module.exports = {
         url    : 'https://git-wip-us.apache.org/repos/asf?p=cordova-amazon-fireos.git',
         version: '3.5.0'
     },
-    'wp7' : {
-        hostos : ['win32'],
-        parser : './metadata/wp7_parser',
-        url    : 'https://git-wip-us.apache.org/repos/asf?p=cordova-wp8.git',
-        version: '3.5.0',
-        subdirectory: 'wp7'
-    },
     'wp8' : {
         hostos : ['win32'],
         parser : './metadata/wp8_parser',
@@ -72,10 +65,17 @@ module.exports = {
     },
     'windows8':{
         hostos : ['win32'],
-        parser: './metadata/windows8_parser',
-        url    : 'https://git-wip-us.apache.org/repos/asf?p=cordova-windows.git',
-        version: '3.5.0',
-        subdirectory: 'windows8'
+        parser: './metadata/windows_parser',
+        url    : 'http://github.com/MSOpenTech/cordova-windows/archive/win81.tar.gz',
+        version: '3.6.0',
+        subdirectory: 'windows'
+    },
+    'windows':{
+        hostos : ['win32'],
+        parser: './metadata/windows_parser',
+        url    : 'http://github.com/MSOpenTech/cordova-windows/archive/win81.tar.gz',
+        version: '3.6.0',
+        subdirectory: 'windows'
     }
 };
 

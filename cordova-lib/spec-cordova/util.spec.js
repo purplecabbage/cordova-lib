@@ -134,11 +134,12 @@ describe('util module', function() {
             var atari = path.join(platforms, 'atari');
             shell.mkdir('-p', android);
             shell.mkdir('-p', ios);
-            shell.mkdir('-p', wp7);
+            shell.mkdir('-p', wp7); // not supported anymore
             shell.mkdir('-p', atari);
             var res = util.listPlatforms(temp);
-            expect(res.length).toEqual(3);
+            expect(res.length).toEqual(2);
             expect(res.indexOf('atari')).toEqual(-1);
+            expect(res.indexOf('wp7')).toEqual(-1);
         });
     });
     describe('findPlugins method', function() {

@@ -108,6 +108,11 @@ exports = module.exports = function prepare(options) {
                 // Update platform config.xml based on top level config.xml
                 var platform_cfg = new ConfigParser(parser.config_xml());
                 exports._mergeXml(cfg.doc.getroot(), platform_cfg.doc.getroot(), platform, true);
+                
+                if (platform == 'windows') { // Windows8.1. We temporary allow using windows8 tag for windows
+                    exports._mergeXml(cfg.doc.getroot(), platform_cfg.doc.getroot(), 'windows8', true);
+                }
+
                 platform_cfg.write();
 
                 return parser.update_project(cfg);

@@ -1,4 +1,4 @@
-var csproj  = require('../../src/plugman/util/csproj'),
+var csproj  = require('../../src/plugman/util/proj'),
     path    = require('path'),
     os      = require('osenv'),
     et      = require('elementtree'),
